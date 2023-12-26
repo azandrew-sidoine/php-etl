@@ -1,0 +1,24 @@
+{
+    "name": "drewlabs/data-import",
+    "description": "Program: Migrate data from source database to destination database table",
+    "type": "project",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Drewlabs\\ETL\\": "src/"
+        },
+        "files": [
+            "lib/index.php"
+        ]
+    },
+    "authors": [
+        {
+            "name": "azandrew-sidoine",
+            "email": "azandrewdevelopper@gmail.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "symfony/process": "^6.4"
+    }
+}

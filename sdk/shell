@@ -1,0 +1,13 @@
+php .workspace/import/index.php "CAISSE NATIONALE DE SECURITE SOCIALE" --user=docker --password=homestead --db=cnssdb --port=3306 --dstUser=docker --dstPassword=homestead --dstDb=stmt --dstPort=3306 --policy_holder_status=1
+
+
+nohup php migrate_policy_client.php --user=docker --password=homestead --db=cnssdb --port=3306 --dstUser=docker --dstPassword=homestead --dstDb=docker --dstPort=3306 &>> ./out/migrate-2023-12-15.log &
+
+php migrate_employeur_users.php --user=docker --password=homestead --db=cnssdb --port=3306 --dstUser=docker --dstPassword=homestead --dstDb=u --dstPort=3306 --appUser=docker --appPassword=homestead --appDb=docker --appPort=3306  &>> ./out/migrate-empl-users-2023-12-15.log &
+
+php migrate_assure_users.php --user=docker --password=homestead --db=cnssdb --port=3306 --dstUser=docker --dstPassword=homestead --dstDb=u --dstPort=3306 --appUser=docker --appPassword=homestead --appDb=docker --appPort=3306  &>> ./out/migrate-ass-users-2023-12-15.log &
+
+// process
+ps aux | grep "1939"
+
+php process.php --user=docker --password=homestead --db=cnssdb --port=3306 --dstUser=docker --dstPassword=homestead --dstDb=docker --dstPort=3306
