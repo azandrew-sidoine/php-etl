@@ -129,6 +129,7 @@ function create_database_connection(string $user, string $password, $dsn_or_host
         $dsn = false === filter_var($dsn_or_host, FILTER_VALIDATE_IP) ? $dsn_or_host : create_dsn($dsn_or_host, $dbname, $driver, $port, $charset);
         return new PDO($dsn, $user, $password, [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_OBJ]);
     } catch (\Throwable $e) {
+        printf("%s\n", $e->getMessage());
     }
 }
 

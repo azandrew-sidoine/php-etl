@@ -70,7 +70,6 @@ function insert_policy_holder(\PDO $pdo, array $record, array $options, &$policy
         'person_id' => $person_id,
         'enrolled_at' => $record['date_immatriculation'] ?? null,
         'sin' => $record['numero_assure'],
-        'policy_number' => $record['numero_assure'],
         'handicaped' => isset($record['code_etat_handicap']) && strtoupper($record['code_etat_handicap']) === 'O' ? 1 : 0,
         'status' => $record['etat_assure']
     ];
