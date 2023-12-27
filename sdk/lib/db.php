@@ -129,6 +129,7 @@ function create_database_connection(string $user, string $password, $dsn_or_host
         $dsn = false === filter_var($dsn_or_host, FILTER_VALIDATE_IP) ? $dsn_or_host : create_dsn($dsn_or_host, $dbname, $driver, $port, $charset);
         return new PDO($dsn, $user, $password, [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_OBJ]);
     } catch (\Throwable $e) {
+        printf("%s\n", $e->getMessage());
     }
 }
 
@@ -288,8 +289,8 @@ function db_connect(callable $conn_factory, \PDO $connection = null)
 
     while ($attempts < 7) {
         // Wait for 5 second to create a connection
-        usleep(1000 * 1000 * 5);
-        printf("Attempting to reconnect...\n");
+        usleep(1000 * 1000 * 3);
+        printf("Attempting to connect...\n");
         $connection = call_user_func($conn_factory);
         if (null !== $connection) {
             return $connection;
