@@ -17,8 +17,5 @@
             "email": "azandrewdevelopper@gmail.com"
         }
     ],
-    "minimum-stability": "stable",
-    "require": {
-        "symfony/process": "^6.4"
-    }
+    "minimum-stability": "stable"
 }

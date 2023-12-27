@@ -2,14 +2,12 @@
 
 require __DIR__ . '/vendor/autoload.php';
 
-
 function get_employeurs_table_records(\PDO $pdo)
 {
     $sql = "SELECT * FROM employeurs";
 
     return db_select($pdo, $sql, [], true, \PDO::FETCH_ASSOC);
 }
-
 
 function get_employeurs_table_records_count(\PDO $pdo)
 {
@@ -58,21 +56,6 @@ function get_assures_carriere(\PDO $pdo, string $ssn)
 }
 
 
-function policy_holder_exists(\PDO $pdo, string $ssn = null)
-{
-    $sql = "SELECT COUNT(DISTINCT sin)
-            FROM ass_policy_holders
-            WHERE sin=?";
-    // Create and prepare PDO statement
-    $stmt = $pdo->prepare($sql);
-    $stmt->bindParam(1, $ssn, \PDO::PARAM_STR);
-    // Execute the PDO statement
-    $stmt->execute();
-    // Return the result of the query
-    return $stmt->fetchColumn(0) !== 0;
-}
-
-
 function registrant_exists(\PDO $pdo, string $ssn = null)
 {
     $sql = "SELECT COUNT(DISTINCT sin)
@@ -103,137 +86,25 @@ function select_registrant(\PDO $pdo, string $ssn = null)
     return $stmt->fetch(\PDO::FETCH_ASSOC);
 }
 
-function insert_policy_holder(\PDO $pdo, array $record, array $options, &$policy_holders)
+function select_policy_holder(\PDO $pdo, string $ssn)
 {
+    $sql = "SELECT *
+            FROM ass_policy_holders
+            WHERE sin=?
+            LIMIT 1";
+    // Create and prepare PDO statement
+    $stmt = $pdo->prepare($sql);
 
-    // Check if policy holder exists with the ssn
-    $policy_holder_exists = policy_holder_exists(db_connect(function () use ($options) {
-        return create_dst_connection($options);
-    }, $pdo), $record['numero_assure']);
+    $stmt->bindParam(1, $ssn, \PDO::PARAM_STR);
 
-    if ($policy_holder_exists) {
-        return;
-    }
+    // Execute the PDO statement
+    $stmt->execute();
 
-    $person_id = str_uuid();
-    $person = [
-        'id' => $person_id,
-        'firstname' => $record['prenoms'],
-        'lastname' => $record['nom'],
-        'sex' => $record['sexe'],
-        'birth_date' => $record['date_naissance'],
-        'birth_place' => $record['lieu_naissance'] ?? null,
-        'birth_country' => $record['code_pays_nais'] ?? null,
-        'nationality' => $record['code_pays_nationalite'] ?? null,
-        'marital_status_id' => $record['code_site_matri_actuel'] ?? null,
-        'civil_state_id' => $record['code_civilite'] ?? null
-
-    ];
-
-    // Insert person to database
-    db_insert(db_connect(function () use ($options) {
-        return create_dst_connection($options);
-    }, $pdo), 'ass_persons', $person);
-
-
-    // Policy holder
-    $policy_holder_id = str_uuid();
-    $policy_holder = [
-        'id' => $policy_holder_id,
-        'policy_holder_type_id' => $record['type_assure'],
-        'person_id' => $person_id,
-        'enrolled_at' => $record['date_immatriculation'] ?? null,
-        'sin' => $record['numero_assure'],
-        'policy_number' => $record['numero_assure'],
-        'handicaped' => isset($record['code_etat_handicap']) && strtoupper($record['code_etat_handicap']) === 'O' ? 1 : 0,
-        'status' => $record['etat_assure']
-    ];
-    // Insert policy holder into database
-    db_insert(db_connect(function () use ($options) {
-        return create_dst_connection($options);
-    }, $pdo), 'ass_policy_holders', $policy_holder);
-    $policy_holders[$record['numero_assure']] = $policy_holder_id;
-
-    // Insert policy holder contact
-    $contact = [
-        'id' => str_uuid(),
-        'policy_holder_id' => $policy_holder_id,
-        'phone_number' => $record['tel'] ?? '',
-        'email' => $record['email'],
-        'po_box' => $record['bp_ville'],
-        'address' => $record['adresse'] ?? $record['rue'] ?? null
-    ];
-
-    // Insert policy holder contact
-    db_insert(db_connect(function () use ($options) {
-        return create_dst_connection($options);
-    }, $pdo), 'ass_policy_holder_contacts', $contact);
-
-    // Insert in policy holders addresses
-    $address = [
-        'id' => str_uuid(),
-        'policy_holder_id' => $policy_holder_id,
-        'country' => $record['code_pays_adr'] ?? null,
-        'city' => $record['code_ville'] ?? null,
-        'region' => $record['code_region'] ?? null,
-        'municipality' => $record['code_commune'] ?? null,
-        'prefecture' => $record['code_prefecture'],
-        'district' => $record['code_quartier_unique'] ?? null,
-        'physical_address' => $record['adresse']
-    ];
-    db_insert(db_connect(function () use ($options) {
-        return create_dst_connection($options);
-    }, $pdo), 'ass_policy_holder_addresses', $address);
-
-    // Insert father's information
-    $address = [
-        'id' => str_uuid(),
-        'policy_holder_id' => $policy_holder_id,
-        'firstname' => $record['prenom_pere'] ?? null,
-        'lastname' => $record['nom_pere'] ?? null,
-        'birth_date' => $record['date_nais_pere'] ?? null,
-        'birth_place' => $record['lieu_nais_pere'] ?? null,
-        'ancestor_tag' => 'p',
-        'ancestor_condition' => $record['etat_pere'] ?? null,
-    ];
-    db_insert(db_connect(function () use ($options) {
-        return create_dst_connection($options);
-    }, $pdo), 'ass_policy_holder_ancestors', $address);
-
-    // Insert mother's information
-    $address = [
-        'id' => str_uuid(),
-        'policy_holder_id' => $policy_holder_id,
-        'firstname' => $record['prenom_mere'] ?? null,
-        'lastname' => $record['nom_mere'] ?? null,
-        'birth_date' => $record['date_nais_mere'] ?? null,
-        'birth_place' => $record['lieu_nais_mere'] ?? null,
-        'ancestor_tag' => 'm',
-        'ancestor_condition' => $record['etat_mere'] ?? null,
-    ];
-    db_insert(db_connect(function () use ($options) {
-        return create_dst_connection($options);
-    }, $pdo), 'ass_policy_holder_ancestors', $address);
-    // Return the create policy holder id
-    return $policy_holder_id;
+    // Return the result of the query
+    return $stmt->fetch(\PDO::FETCH_ASSOC);
 }
 
-
-/**
- * Insert record on each iteration
- * 
- * @param mixed $record 
- * @param array $options 
- * @param array $policy_holders 
- * @param array $registrants 
- * @param PDO|null $dstPdo 
- * @param PDO|null $pdo 
- * @return void 
- * @throws PDOException 
- * @throws RandomException 
- * @throws Exception 
- */
-function insert_records($record, array $options, array &$policy_holders, array &$registrants, \PDO $dstPdo = null, \PDO $pdo = null)
+function insert_records($record, array $options, array &$registrants, \PDO $dstPdo = null, \PDO $pdo = null)
 {
     // 
     $registrant_exists = registrant_exists(db_connect(function () use ($options) {
@@ -255,16 +126,6 @@ function insert_records($record, array $options, array &$policy_holders, array &
         'sin' => $record['numero_employeur'],
     ]);
 
-    // Select the created registrant
-    // $result = select_registrant(db_connect(function () use ($options) {
-    //     return create_dst_connection($options);
-    // }, $dstPdo), $record['numero_employeur']);
-
-    // if (!$result) {
-    //     printf("Error while inserting record for employeur [%s]\n", strval($record['numero_employeur']));
-    //     return;
-    // }
-
     // Add registrant to cache
     $registrants[$record['numero_employeur']] = $record['numero_employeur'];
 
@@ -285,10 +146,10 @@ function insert_records($record, array $options, array &$policy_holders, array &
 
     // For each assure record, insert the assure and it carrier
     foreach ($assures as $assure) {
-        $policy_holder_id = insert_policy_holder($dstPdo, $assure, $options, $policy_holders);
-        if (!is_string($policy_holder_id)) {
-            printf("Unable to insert assure [%s] into database\n", $assure['numero_assure']);
-            return;
+        $policy_holder = select_policy_holder($dstPdo, $assure['numero_assure']);
+        if (empty($policy_holder)) {
+            printf("Unable to find assure [%s] in database\n", $assure['numero_assure']);
+            continue;
         }
 
         // Query assure carrier
@@ -311,7 +172,7 @@ function insert_records($record, array $options, array &$policy_holders, array &
             }, $dstPdo), 'ass_registrant_policy_holders', [
                 'id' => str_uuid(),
                 'registrant_id' => $registrant_id,
-                'policy_holder_id' => $policy_holder_id,
+                'policy_holder_id' => $policy_holder['id'],
                 'start_date' => $value['date_entree'],
                 'end_date' => $value['date_sortie']
             ]);
@@ -324,7 +185,7 @@ function insert_records($record, array $options, array &$policy_holders, array &
             }, $dstPdo), 'ass_registrant_policy_holders', [
                 'id' => str_uuid(),
                 'registrant_id' => $record['numero_employeur'],
-                'policy_holder_id' => $policy_holder_id,
+                'policy_holder_id' => $policy_holder['id'],
                 'start_date' => $assure['date_embauche'],
                 'end_date' => null
             ]);
@@ -358,14 +219,12 @@ function create_src_connection(array $options)
 function process_failed_records(array $records, $options)
 {
     printf("Processing failed records...\n");
-    $policy_holders = [];
     $registrants = [];
     foreach ($records as $record) {
         try {
             insert_records(
                 $record,
                 $options,
-                $policy_holders,
                 $registrants,
                 db_connect(function () use ($options) {
                     return create_dst_connection($options);
@@ -426,7 +285,6 @@ function main(array $args)
         return create_src_connection($options);
     }, $pdo));
     $index = 0;
-    $policy_holders = [];
     $registrants = [];
     $failed = [];
 
@@ -439,7 +297,6 @@ function main(array $args)
             insert_records(
                 $record,
                 $options,
-                $policy_holders,
                 $registrants,
                 db_connect(function () use ($options) {
                     return create_dst_connection($options);
