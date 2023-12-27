@@ -4,13 +4,24 @@ namespace Drewlabs\ETL;
 
 class ETLTask
 {
+    private $from;
+    private $to;
+    private $constraints;
+    private $columns;
+    private $query;
+
     public function __construct(
-        private ReadOnlyTable $from,
-        private Table $to,
-        private Constraints $constraints,
-        private array $columns = ['*'],
-        private ?string $query = null
+        ReadOnlyTable $from,
+        Table $to,
+        Constraints $constraints,
+        array $columns = ['*'],
+        string $query = null
     ) {
+        $this->from = $from;
+        $this->to = $to;
+        $this->constraints = $constraints;
+        $this->columns = $columns;
+        $this->query = $query;
     }
 
 

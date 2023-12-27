@@ -4,6 +4,9 @@ namespace Drewlabs\ETL;
 
 class SQLTable implements Table
 {
+    private $factory;
+    private $name;
+    private $columns;
 
     /**
      * Class constructor
@@ -12,8 +15,14 @@ class SQLTable implements Table
      * @param string $name 
      * @param string|array $columns 
      */
-    public function __construct(private ConnectionFactory $factory, private string $name, private string|array $columns = '*')
-    {
+    public function __construct(
+        ConnectionFactory $factory,
+        string $name,
+        $columns = '*'
+    ) {
+        $this->factory = $factory;
+        $this->name = $name;
+        $this->columns = $columns;
     }
 
     public function add_many(array $values)

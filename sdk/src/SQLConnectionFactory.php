@@ -8,16 +8,30 @@ class SQLConnectionFactory implements ConnectionFactory
      * @var \PDO
      */
     private $pdo;
+    private  $user;
+    private  $password;
+    private  $driver;
+    private  $dns_or_host;
+    private  $port;
+    private  $dbname;
+    private  $charset;
 
     public function __construct(
-        private string $user = 'docker',
-        private string $password = 'docker',
-        private string $driver = 'mysql',
-        private string $dns_or_host = '0.0.0.0',
-        private int $port = 3306,
-        private ?string $dbname = null,
-        private string $charset = 'UTF8'
+        string $user = 'docker',
+        string $password = 'docker',
+        string $driver = 'mysql',
+        string $dns_or_host = '0.0.0.0',
+        int $port = 3306,
+        ?string $dbname = null,
+        string $charset = 'UTF8'
     ) {
+        $this->user = $user;
+        $this->password = $password;
+        $this->driver = $driver;
+        $this->dns_or_host = $dns_or_host;
+        $this->port = $port;
+        $this->dbname = $dbname;
+        $this->charset = $charset;
     }
 
     /**

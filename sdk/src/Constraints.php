@@ -5,8 +5,11 @@ namespace Drewlabs\ETL;
 class Constraints
 {
 
-    public function __construct(private array $unique)
+    private $unique;
+
+    public function __construct(array $unique)
     {
+        $this->unique = $unique;
     }
 
     /**
