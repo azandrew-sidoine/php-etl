@@ -288,8 +288,8 @@ function db_connect(callable $conn_factory, \PDO $connection = null)
 
     while ($attempts < 7) {
         // Wait for 5 second to create a connection
-        usleep(1000 * 1000 * 5);
-        printf("Attempting to reconnect...\n");
+        usleep(1000 * 1000 * 3);
+        printf("Attempting to connect...\n");
         $connection = call_user_func($conn_factory);
         if (null !== $connection) {
             return $connection;

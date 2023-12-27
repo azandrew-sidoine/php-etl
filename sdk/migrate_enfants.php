@@ -33,6 +33,13 @@ function create_app_connection(array $options)
     return create_database_connection($options['appUser'] ?? "docker", $options['appPassword'] ?? "homestead", $options['appHost'] ?? "0.0.0.0", "mysql", $options['appDb'] ?? "docker", $options['appPort'] ?? 3306);
 }
 
+
+function get_enfants(\PDO $pdo, string $table)
+{
+    return db_select($pdo, "SELECT * FROM $table", [], true, \PDO::FETCH_ASSOC);
+}
+
+
 function get_policy_holder(\PDO $pdo, string $table, string $ssn)
 {
     $sql = "SELECT id, sin
@@ -52,40 +59,9 @@ function get_policy_holder(\PDO $pdo, string $table, string $ssn)
     return $stmt->fetch(\PDO::FETCH_ASSOC);
 }
 
-function get_mariage_bound(\PDO $pdo, string $table, string $policy_holder, string $policy)
-{
-    $sql = "SELECT id
-            FROM $table
-            WHERE policy_holder_id=? AND policy_number=?
-            LIMIT 1";
-    // Create and prepare PDO statement
-    $stmt = $pdo->prepare($sql);
-
-    // Bind pdo parameters
-    $stmt->bindParam(1, $policy_holder, \PDO::PARAM_STR);
-    $stmt->bindParam(2, $policy, \PDO::PARAM_STR);
-
-    // Execute the PDO statement
-    $stmt->execute();
-
-    // Return the result of the query
-    return $stmt->fetch(\PDO::FETCH_ASSOC);
-}
-
-
-function get_conjoints(\PDO $pdo, string $table, string $join)
-{
-    $sql = "SELECT t_1.numero_conjoint, t_1.prenoms, t_1.nom, t_1.sexe, t_1.date_naissance, t_1.etat_conjoint, t_2.numero_assure, t_2.date_lien, t_2.type_lien, t_2.created_at, t_2.updated_at 
-            FROM $table as t_1
-            JOIN $join as t_2
-            ON t_1.numero_conjoint = t_2.numero_conjoint";
-
-    return db_select($pdo, $sql, [], true, \PDO::FETCH_ASSOC);
-}
-
 function main(array $args)
 {
-    $program = 'Program: Migrate CNSS conjoints from source to destination database';
+    $program = 'Program: Migrate CNSS enfants from source to destination database';
     printf(str_repeat('-', strlen($program)));
     printf("\n%s\n", $program);
     printf("%s\n", str_repeat('-', strlen($program)));
@@ -109,68 +85,49 @@ function main(array $args)
     $dstPdo = db_connect(function () use ($options) {
         return create_dst_connection($options);
     });
+    $enfants  = get_enfants($pdo, 'enfants');
+    $total = iterator_count($enfants);
 
-    $conjoints  = get_conjoints($pdo, 'conjoints', 'assure_conjoints');
-    $total = iterator_count($conjoints);
+    printf("Migrating total of %d enfants...\n", $total);
 
-    printf("Migrating total of %d conjoints...\n", $total);
-
-    foreach ($conjoints as $conjoint) {
+    foreach ($enfants as $enfant) {
         # code...
-
-        $policy_holder = get_policy_holder(db_connect(function () use ($options) {
-            return create_app_connection($options);
-        }, $dstPdo), 'ass_policy_holders', $conjoint['numero_assure']);
-
-        if ($policy_holder) {
-            // TODO: Get ass_mariage_bounds where policy_holder_id and policy_number exists
-            $mariage_bound = get_mariage_bound(db_connect(function () use ($options) {
-                return create_app_connection($options);
-            }, $dstPdo), 'ass_mariage_bounds', $policy_holder['id'], $conjoint['numero_conjoint']);
-            if ($mariage_bound) {
-                printf("Mariage bound already exists for %s - %s\n", $policy_holder['sin'], $conjoint['numero_conjoint']);
-                continue;
-            }
-        }
-        if (!is_array($policy_holder)) {
-            printf("Data not found for policy holder: %s\n",  $conjoint['numero_assure']);
-            continue;
-        }
         $person_id = str_uuid();
         db_insert(db_connect(function () use ($options) {
             return create_dst_connection($options);
         }, $dstPdo), 'ass_persons', [
             'id' => $person_id,
-            'firstname' => $conjoint['prenoms'],
-            'lastname' => $conjoint['nom'],
-            'sex' => $conjoint['sexe'],
-            'birth_date' => $conjoint['date_naissance'],
+            'firstname' => $enfant['prenoms'],
+            'lastname' => $enfant['nom'],
+            'sex' => $enfant['sexe'],
+            'birth_date' => $enfant['date_naissance'],
             'birth_place' => null,
             'birth_country' =>  null,
             'nationality' =>  null,
             'marital_status_id' => null,
             'civil_state_id' => null,
-            'created_at' => $conjoint['created_at'],
-            'updated_at' => $conjoint['updated_at']
+            'created_at' => $enfant['created_at'],
+            'updated_at' => $enfant['updated_at']
         ]);
 
+        $policy_holder = get_policy_holder(db_connect(function () use ($options) {
+            return create_app_connection($options);
+        }, $dstPdo), 'ass_policy_holders', $enfant['numero_assure']);
         if ($policy_holder && !empty($policy_holder)) {
             db_insert(db_connect(function () use ($options) {
                 return create_dst_connection($options);
-            }, $dstPdo), 'ass_mariage_bounds', [
+            }, $dstPdo), 'ass_parenting_bounds', [
                 'id' => str_uuid(),
                 'policy_holder_id' => strval($policy_holder['id']),
                 'person_id' => $person_id,
-                'policy_number' => strval($conjoint['numero_conjoint']),
-                'bound_at' => $conjoint['date_lien'] ?? null,
-                'bound_type_id' => $conjoint['type_lien'] ?? null,
-                'spouce_state_id' =>  $conjoint['etat_conjoint'] ?? null,
-                'created_at' => $conjoint['created_at'],
-                'updated_at' => $conjoint['updated_at']
+                'descendant_state_id' => $enfant['etat_enfant'],
+                'policy_number' => strval($enfant['numero_enfant']),
+                'created_at' => $enfant['created_at'],
+                'updated_at' => $enfant['updated_at']
             ]);
             continue;
         }
-        
+        printf("Policy holder %s does not exists for enfant: %s\n", strval($enfant['numero_assure']), strval($enfant['numero_enfant']));
     }
     printf(sprintf("\nThanks for using the program!\n"));
 }

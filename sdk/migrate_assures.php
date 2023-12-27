@@ -201,13 +201,13 @@ function main(array $args)
 
     // For each assure record, insert the assure and it carrier
     foreach ($assures as $assure) {
-        printf("Inserting record for employeur [%s] \n", $assure['numero_assure']);
+        printf("Inserting record for assures [%s] \n", $assure['numero_assure']);
         $policy_holder_id = insert_policy_holder($dstPdo, $assure, $options, $policy_holders);
         if (!is_string($policy_holder_id)) {
             printf("Unable to insert assure [%s] into database, policy holder already exists\n", $assure['numero_assure']);
             continue;
         }
-        printf("Inserted record for employeur [%s] \n", $assure['numero_assure']);
+        printf("Inserted record for assures [%s] \n", $assure['numero_assure']);
     }
 
     printf(sprintf("\nThanks for using the program!\n"));
