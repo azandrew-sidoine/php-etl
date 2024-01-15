@@ -306,13 +306,15 @@ function main(array $args)
     // For each assure record, insert the assure and it carrier
     foreach ($assures as $assure) {
         try {
-            printf("Inserting record for assures [%s] \n", $assure['numero_assure']);
+            printf("Inserting record for assure [%s] \n", $assure['numero_assure']);
             $policy_holder_id = insert_policy_holder($dstPdo, $assure, $options, $policy_holders);
             if (!is_string($policy_holder_id)) {
                 continue;
             }
             printf("Inserted record for assures [%s] \n", $assure['numero_assure']);
         } catch (\PDOException $e) {
+            printf("Error while inserting record for assure [%s]: %s \n", $assure['numero_assure'], $e->getMessage());
+            
             $failed_migrations[] = $assure;
             // Case there was a PDO exception when execting migration, we add the failed
             // assure record to the failed task array and recreate connection to the database
