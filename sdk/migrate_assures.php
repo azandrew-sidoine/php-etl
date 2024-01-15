@@ -192,7 +192,7 @@ function insert_policy_holder(\PDO $pdo, array $record, array $options, &$policy
             delete_policy_holder_metadata(db_connect(function () use ($options) {
                 return create_dst_connection($options);
             }, $pdo), $policy_holder['id']);
-            
+
             printf("Inserting new policy holder [%s] metadata...\n", $policy_holder['sin']);
             // The we insert back new values
             insert_policy_holder_metadata(db_connect(function () use ($options) {
@@ -264,6 +264,7 @@ function create_src_connection(array $options)
     return create_database_connection($options['user'] ?? "docker", $options['password'] ?? "homestead", $options['host'] ?? "0.0.0.0", "mysql", $options['db'] ?? "docker", $options['port'] ?? 3306);
 }
 
+
 // Main program
 function main(array $args)
 {
@@ -300,15 +301,52 @@ function main(array $args)
     printf(sprintf("Importing a total of %d assures...\n", iterator_count($assures)));
 
     $policy_holders = [];
+    $failed_migrations = [];
 
     // For each assure record, insert the assure and it carrier
     foreach ($assures as $assure) {
-        printf("Inserting record for assures [%s] \n", $assure['numero_assure']);
-        $policy_holder_id = insert_policy_holder($dstPdo, $assure, $options, $policy_holders);
-        if (!is_string($policy_holder_id)) {
-            continue;
+        try {
+            printf("Inserting record for assures [%s] \n", $assure['numero_assure']);
+            $policy_holder_id = insert_policy_holder($dstPdo, $assure, $options, $policy_holders);
+            if (!is_string($policy_holder_id)) {
+                continue;
+            }
+            printf("Inserted record for assures [%s] \n", $assure['numero_assure']);
+        } catch (\PDOException $e) {
+            $failed_migrations[] = $assure;
+            // Case there was a PDO exception when execting migration, we add the failed
+            // assure record to the failed task array and recreate connection to the database
+            $pdo = db_connect(function () use ($options) {
+                return create_src_connection($options);
+            });
+            $dstPdo = db_connect(function () use ($options) {
+                return create_dst_connection($options);
+            });
         }
-        printf("Inserted record for assures [%s] \n", $assure['numero_assure']);
+    }
+
+    if (!empty($failed_migrations)) {
+        printf("Retrying a total of %d failed migration...\n");
+        $pdo = db_connect(function () use ($options) {
+            return create_src_connection($options);
+        });
+        $dstPdo = db_connect(function () use ($options) {
+            return create_dst_connection($options);
+        });
+        foreach ($assures as $assure) {
+            try {
+                printf("Inserting failed record for assure [%s] \n", $assure['numero_assure']);
+                $policy_holder_id = insert_policy_holder($dstPdo, $assure, $options, $policy_holders);
+                if (!is_string($policy_holder_id)) {
+                    continue;
+                }
+                printf("Inserted record for assures [%s] \n", $assure['numero_assure']);
+            } catch (\Throwable $e) {
+                // on exception during the failed migrations retry, we just log it to the
+                // standard output and continues
+                printf("Exception occured during retry: %s\n", $e->getMessage());
+            }
+        }
     }
 
     printf(sprintf("\nThanks for using the program!\n"));
