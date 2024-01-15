@@ -27,7 +27,7 @@ class ETLTask
 
     public function run()
     {
-        $values = $this->from->all($this->query);
+	$values = $this->from->all($this->query);
         $uniques = $this->constraints->getUniqueConstraints();
         // Cache is used to store possible duplicate keys for data read from
         // source table in the current process
@@ -40,7 +40,7 @@ class ETLTask
                 // TODO: PROVIDES SUPPORT FOR TRANSFORM
                 $result = $this->getPropertyValue($value, $prop);
                 // Do an early stopping in case duplicate is detected
-                if (in_array($k, $uniques)) {
+		if (in_array($k, $uniques)) {
                     // Case the provided colum exists in database table, we mark the record as duplicate
                     // and drop from execution context
                     if ($this->to->exists("$k = $result") || in_array(trim($result), $cache[$k] ?? [])) {
@@ -53,7 +53,6 @@ class ETLTask
                 }
                 $attributes[$k] = $result;
             }
-
             // Case the duplicated flag value is false, we can insert
             // the column in the table, else we drop the insertion
             if (!$duplicated) {
@@ -66,7 +65,6 @@ class ETLTask
         if (empty($data)) {
             return 0;
         }
-
         // Return the list of added data
         return $this->to->add_many($data);
     }

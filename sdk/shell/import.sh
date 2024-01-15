@@ -71,14 +71,14 @@ echo "Migrating conjoints to destination database..."
 start=$(date +%s)
 php migrate_conjoint.php --user=$MARIADB_USER --password=$MARIADB_PASSWORD --db=$MARIADB_DB --port=$MARIADB_PORT --dstUser=$MARIADB_APP_USER --dstPassword=$MARIADB_APP_PASSWORD --dstDb=$MARIADB_APP_DB --dstPort=$MARIADB_APP_PORT  &> "./out/conjoints-$start.log" &
 
-echo "Migrating assures users..."
-php migrate_assure_users.php --user=$MARIADB_USER --password=$MARIADB_PASSWORD --db=$MARIADB_DB --port=$MARIADB_PORT --dstUser=$MARIADB_AUTH_USER --dstPassword=$MARIADB_AUTH_PASSWORD --dstDb=$MARIADB_AUTH_DB --dstPort=$MARIADB_AUTH_PORT --appUser=$MARIADB_APP_USER --appPassword=$MARIADB_APP_PASSWORD --appDb=$MARIADB_APP_DB --appPort=$MARIADB_APP_PORT  &> "./out/migrate-ass-users-$start.log" &
+# echo "Migrating assures users..."
+# php migrate_assure_users.php --user=$MARIADB_USER --password=$MARIADB_PASSWORD --db=$MARIADB_DB --port=$MARIADB_PORT --dstUser=$MARIADB_AUTH_USER --dstPassword=$MARIADB_AUTH_PASSWORD --dstDb=$MARIADB_AUTH_DB --dstPort=$MARIADB_AUTH_PORT --appUser=$MARIADB_APP_USER --appPassword=$MARIADB_APP_PASSWORD --appDb=$MARIADB_APP_DB --appPort=$MARIADB_APP_PORT  &> "./out/migrate-ass-users-$start.log" &
 
 echo "Migrating employeurs and assurés carrière..."
 php migrate_policy_client.php --user=$MARIADB_USER --password=$MARIADB_PASSWORD --db=$MARIADB_DB --port=$MARIADB_PORT --dstUser=$MARIADB_APP_USER --dstPassword=$MARIADB_APP_PASSWORD --dstDb=$MARIADB_APP_DB --dstPort=$MARIADB_APP_PORT
 
-echo "Migrating employeurs users..."
-php migrate_employeur_users.php --user=$MARIADB_USER --password=$MARIADB_PASSWORD --db=$MARIADB_DB --port=$MARIADB_PORT --dstUser=$MARIADB_AUTH_USER --dstPassword=$MARIADB_AUTH_PASSWORD --dstDb=$MARIADB_AUTH_DB --dstPort=$MARIADB_AUTH_PORT --appUser=$MARIADB_APP_USER --appPassword=$MARIADB_APP_PASSWORD --appDb=$MARIADB_APP_DB --appPort=$MARIADB_APP_PORT  &> "./out/migrate-empl-users-$start.log" &
+#echo "Migrating employeurs users..."
+#php migrate_employeur_users.php --user=$MARIADB_USER --password=$MARIADB_PASSWORD --db=$MARIADB_DB --port=$MARIADB_PORT --dstUser=$MARIADB_AUTH_USER --dstPassword=$MARIADB_AUTH_PASSWORD --dstDb=$MARIADB_AUTH_DB --dstPort=$MARIADB_AUTH_PORT --appUser=$MARIADB_APP_USER --appPassword=$MARIADB_APP_PASSWORD --appDb=$MARIADB_APP_DB --appPort=$MARIADB_APP_PORT  &> "./out/migrate-empl-users-$start.log" &
 
 
 echo "Script execution completed, check logs for any information. Thanks!"
