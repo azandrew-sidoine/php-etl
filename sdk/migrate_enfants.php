@@ -59,6 +59,26 @@ function get_policy_holder(\PDO $pdo, string $table, string $ssn)
     return $stmt->fetch(\PDO::FETCH_ASSOC);
 }
 
+function get_parenting_bound(\PDO $pdo, string $table, string $policy_holder, string $policy)
+{
+    $sql = "SELECT id
+            FROM $table
+            WHERE policy_holder_id=? AND policy_number=?
+            LIMIT 1";
+    // Create and prepare PDO statement
+    $stmt = $pdo->prepare($sql);
+
+    // Bind pdo parameters
+    $stmt->bindParam(1, $policy_holder, \PDO::PARAM_STR);
+    $stmt->bindParam(2, $policy, \PDO::PARAM_STR);
+
+    // Execute the PDO statement
+    $stmt->execute();
+
+    // Return the result of the query
+    return $stmt->fetch(\PDO::FETCH_ASSOC);
+}
+
 function main(array $args)
 {
     $program = 'Program: Migrate CNSS enfants from source to destination database';
@@ -91,6 +111,28 @@ function main(array $args)
     printf("Migrating total of %d enfants...\n", $total);
 
     foreach ($enfants as $enfant) {
+
+        $policy_holder = get_policy_holder(db_connect(function () use ($options) {
+            return create_app_connection($options);
+        }, $dstPdo), 'ass_policy_holders', $enfant['numero_assure']);
+
+        if (!$policy_holder) {
+            printf("Policy holder %s does not exists for enfant: %s\n", strval($enfant['numero_assure']), strval($enfant['numero_enfant']));
+            continue;
+        }
+
+        // TODO: Get ass_parenting_bounds where policy_holder_id and policy_number exists
+        $parenting_bound = get_parenting_bound(db_connect(function () use ($options) {
+            return create_app_connection($options);
+        }, $dstPdo), 'ass_parenting_bounds', $policy_holder['id'], strval($enfant['numero_enfant']));
+
+        // Case the parenting bound already exists, notify user and continue
+        if ($parenting_bound) {
+            // TODO: In future release, update the existing parenting bound
+            printf("Parenting bound already exists for %s - %s\n", $policy_holder['sin'], strval($enfant['numero_enfant']));
+            continue;
+        }
+
         # code...
         $person_id = str_uuid();
         db_insert(db_connect(function () use ($options) {

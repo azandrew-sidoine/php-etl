@@ -117,25 +117,25 @@ function main(array $args)
 
     foreach ($conjoints as $conjoint) {
         # code...
-
         $policy_holder = get_policy_holder(db_connect(function () use ($options) {
             return create_app_connection($options);
         }, $dstPdo), 'ass_policy_holders', $conjoint['numero_assure']);
 
-        if ($policy_holder) {
-            // TODO: Get ass_mariage_bounds where policy_holder_id and policy_number exists
-            $mariage_bound = get_mariage_bound(db_connect(function () use ($options) {
-                return create_app_connection($options);
-            }, $dstPdo), 'ass_mariage_bounds', $policy_holder['id'], $conjoint['numero_conjoint']);
-            if ($mariage_bound) {
-                printf("Mariage bound already exists for %s - %s\n", $policy_holder['sin'], $conjoint['numero_conjoint']);
-                continue;
-            }
-        }
         if (!is_array($policy_holder)) {
             printf("Data not found for policy holder: %s\n",  $conjoint['numero_assure']);
             continue;
         }
+
+        // TODO: Get ass_mariage_bounds where policy_holder_id and policy_number exists
+        $mariage_bound = get_mariage_bound(db_connect(function () use ($options) {
+            return create_app_connection($options);
+        }, $dstPdo), 'ass_mariage_bounds', $policy_holder['id'], $conjoint['numero_conjoint']);
+        if ($mariage_bound) {
+            // TODO: In future release, update the existing mariage bound
+            printf("Mariage bound already exists for %s - %s\n", $policy_holder['sin'], $conjoint['numero_conjoint']);
+            continue;
+        }
+
         $person_id = str_uuid();
         db_insert(db_connect(function () use ($options) {
             return create_dst_connection($options);
@@ -170,7 +170,6 @@ function main(array $args)
             ]);
             continue;
         }
-        
     }
     printf(sprintf("\nThanks for using the program!\n"));
 }

@@ -1,5 +1,6 @@
 <?php
 
+// TODO: Update policy holder values in persons, contact and address tables
 require __DIR__ . '/vendor/autoload.php';
 
 function get_assure_records(\PDO $pdo)
@@ -15,70 +16,72 @@ function get_assure_records(\PDO $pdo)
     );
 }
 
-function policy_holder_exists(\PDO $pdo, string $ssn = null)
+function get_policy_holder(\PDO $pdo, string $ssn = null)
 {
-    $sql = "SELECT COUNT(DISTINCT sin)
+    $sql = "SELECT id, sin
             FROM ass_policy_holders
-            WHERE sin=?";
+            WHERE sin=?
+            LIMIT 1";
     // Create and prepare PDO statement
     $stmt = $pdo->prepare($sql);
+
+    // Bind statement parameters
     $stmt->bindParam(1, $ssn, \PDO::PARAM_STR);
+
     // Execute the PDO statement
     $stmt->execute();
+
     // Return the result of the query
-    return $stmt->fetchColumn(0) !== 0;
+    return $stmt->fetch(\PDO::FETCH_ASSOC);
 }
 
-function insert_policy_holder(\PDO $pdo, array $record, array $options, &$policy_holders)
+/**
+ * 
+ * @param PDO $pdo 
+ * @param string $table 
+ * @param string $ssn 
+ * @param array $values 
+ * @return int 
+ * @throws PDOException 
+ */
+function update_policy_holder(\PDO $pdo, string $table, string $ssn, array $values)
 {
+    $updates = array_reduce(array_keys($values), function ($carry, $curr) {
+        $carry[] = "$curr=?";
+        return $carry;
+    }, []);
+    $sql = "UPDATE $table SET " . implode(", ", $updates) . " WHERE $ssn=?";
 
-    // Check if policy holder exists with the ssn
-    $policy_holder_exists = policy_holder_exists(db_connect(function () use ($options) {
-        return create_dst_connection($options);
-    }, $pdo), $record['numero_assure']);
+    return db_update($pdo, $sql, [...array_values($values), $ssn]);
+}
 
-    if ($policy_holder_exists) {
-        return;
+function update_persons(\PDO $pdo, string $table, string $person_id, array $values)
+{
+    $updates = array_reduce(array_keys($values), function ($carry, $curr) {
+        $carry[] = "$curr=?";
+        return $carry;
+    }, []);
+    $sql = "UPDATE $table SET " . implode(", ", $updates) . " WHERE id=?";
+
+    return db_update($pdo, $sql, [...array_values($values), $person_id]);
+}
+
+function delete_policy_holder_metadata(\PDO $pdo, string $policy_holder_id)
+{
+    $sql_s = [
+        "DELETE FROM ass_policy_holder_contacts WHERE policy_holder_id=?",
+        "DELETE FROM ass_policy_holder_addresses WHERE policy_holder_id=?",
+        "DELETE FROM ass_policy_holder_ancestors WHERE policy_holder_id=?"
+    ];
+
+    foreach ($sql_s as $sql) {
+        $result = db_execute($pdo, $sql, [$policy_holder_id]);
+        printf("Deleted a total of %d for policy holder %s\n", $result, $policy_holder_id);
     }
+}
 
-    $person_id = str_uuid();
-    $person = [
-        'id' => $person_id,
-        'firstname' => $record['prenoms'],
-        'lastname' => $record['nom'],
-        'sex' => $record['sexe'],
-        'birth_date' => $record['date_naissance'],
-        'birth_place' => $record['lieu_naissance'] ?? null,
-        'birth_country' => $record['code_pays_nais'] ?? null,
-        'nationality' => $record['code_pays_nationalite'] ?? null,
-        'marital_status_id' => $record['code_site_matri_actuel'] ?? null,
-        'civil_state_id' => $record['code_civilite'] ?? null
-
-    ];
-
-    // Insert person to database
-    db_insert(db_connect(function () use ($options) {
-        return create_dst_connection($options);
-    }, $pdo), 'ass_persons', $person);
-
-
-    // Policy holder
-    $policy_holder_id = str_uuid();
-    $policy_holder = [
-        'id' => $policy_holder_id,
-        'policy_holder_type_id' => $record['type_assure'],
-        'person_id' => $person_id,
-        'enrolled_at' => $record['date_immatriculation'] ?? null,
-        'sin' => $record['numero_assure'],
-        'handicaped' => isset($record['code_etat_handicap']) && strtoupper($record['code_etat_handicap']) === 'O' ? 1 : 0,
-        'status' => $record['etat_assure']
-    ];
-    // Insert policy holder into database
-    db_insert(db_connect(function () use ($options) {
-        return create_dst_connection($options);
-    }, $pdo), 'ass_policy_holders', $policy_holder);
-    $policy_holders[$record['numero_assure']] = $policy_holder_id;
-
+function insert_policy_holder_metadata(\PDO $pdo, array $record, array $options, $policy_holder_id)
+{
     // Insert policy holder contact
     $contact = [
         'id' => str_uuid(),
@@ -106,6 +109,7 @@ function insert_policy_holder(\PDO $pdo, array $record, array $options, &$policy
         'district' => $record['code_quartier_unique'] ?? null,
         'physical_address' => $record['adresse']
     ];
+
     db_insert(db_connect(function () use ($options) {
         return create_dst_connection($options);
     }, $pdo), 'ass_policy_holder_addresses', $address);
@@ -121,6 +125,7 @@ function insert_policy_holder(\PDO $pdo, array $record, array $options, &$policy
         'ancestor_tag' => 'p',
         'ancestor_condition' => $record['etat_pere'] ?? null,
     ];
+
     db_insert(db_connect(function () use ($options) {
         return create_dst_connection($options);
     }, $pdo), 'ass_policy_holder_ancestors', $address);
@@ -139,6 +144,104 @@ function insert_policy_holder(\PDO $pdo, array $record, array $options, &$policy
     db_insert(db_connect(function () use ($options) {
         return create_dst_connection($options);
     }, $pdo), 'ass_policy_holder_ancestors', $address);
+}
+
+function insert_policy_holder(\PDO $pdo, array $record, array $options, &$policy_holders)
+{
+
+    // Check if policy holder exists with the ssn
+    $policy_holder = get_policy_holder(db_connect(function () use ($options) {
+        return create_dst_connection($options);
+    }, $pdo), $record['numero_assure']);
+
+    // #region updates
+    if ($policy_holder && is_array($policy_holder)) {
+        printf("Policy holder %s, already exists, updating...\n", strval($record['numero_assure']));
+
+        // We update the policy holder columns values case it already exists
+        update_policy_holder(db_connect(function () use ($options) {
+            return create_dst_connection($options);
+        }, $pdo), 'ass_policy_holders', strval($record['numero_assure']), [
+            'policy_holder_type_id' => $record['type_assure'],
+            'enrolled_at' => $record['date_immatriculation'] ?? null,
+            // 'sin' => $record['numero_assure'],
+            'handicaped' => isset($record['code_etat_handicap']) && strtoupper($record['code_etat_handicap']) === 'O' ? 1 : 0,
+            'status' => $record['etat_assure']
+        ]);
+
+        // Update policy holder ass_persons
+        if (isset($policy_holder['person_id'])) {
+            update_persons(db_connect(function () use ($options) {
+                return create_dst_connection($options);
+            }, $pdo), 'ass_persons', $policy_holder['person_id'], [
+                'firstname' => $record['prenoms'],
+                'lastname' => $record['nom'],
+                'sex' => $record['sexe'],
+                'birth_date' => $record['date_naissance'],
+                'birth_place' => $record['lieu_naissance'] ?? null,
+                'birth_country' => $record['code_pays_nais'] ?? null,
+                'nationality' => $record['code_pays_nationalite'] ?? null,
+                'marital_status_id' => $record['code_site_matri_actuel'] ?? null,
+                'civil_state_id' => $record['code_civilite'] ?? null
+            ]);
+        }
+        // TODO: Delete existing contact address ascendant and insert new records
+        if (isset($policy_holder['id'])) {
+            // First we remove any existing policy holder metadata
+            printf("Deleting policy holder [%s] metadata...\n", $policy_holder['sin']);
+            delete_policy_holder_metadata(db_connect(function () use ($options) {
+                return create_dst_connection($options);
+            }, $pdo), $policy_holder['id']);
+            
+            printf("Inserting new policy holder [%s] metadata...\n", $policy_holder['sin']);
+            // The we insert back new values
+            insert_policy_holder_metadata(db_connect(function () use ($options) {
+                return create_dst_connection($options);
+            }, $pdo), $record, $options, $policy_holder['id']);
+        }
+        return;
+    }
+    // #endregion updates
+
+    $person_id = str_uuid();
+    $person = [
+        'id' => $person_id,
+        'firstname' => $record['prenoms'],
+        'lastname' => $record['nom'],
+        'sex' => $record['sexe'],
+        'birth_date' => $record['date_naissance'],
+        'birth_place' => $record['lieu_naissance'] ?? null,
+        'birth_country' => $record['code_pays_nais'] ?? null,
+        'nationality' => $record['code_pays_nationalite'] ?? null,
+        'marital_status_id' => $record['code_site_matri_actuel'] ?? null,
+        'civil_state_id' => $record['code_civilite'] ?? null
+    ];
+
+    // Insert person to database
+    db_insert(db_connect(function () use ($options) {
+        return create_dst_connection($options);
+    }, $pdo), 'ass_persons', $person);
+
+
+    // Policy holder
+    $policy_holder_id = str_uuid();
+    $policy_holder = [
+        'id' => $policy_holder_id,
+        'policy_holder_type_id' => $record['type_assure'],
+        'person_id' => $person_id,
+        'enrolled_at' => $record['date_immatriculation'] ?? null,
+        'sin' => $record['numero_assure'],
+        'handicaped' => isset($record['code_etat_handicap']) && strtoupper($record['code_etat_handicap']) === 'O' ? 1 : 0,
+        'status' => $record['etat_assure']
+    ];
+    // Insert policy holder into database
+    db_insert(db_connect(function () use ($options) {
+        return create_dst_connection($options);
+    }, $pdo), 'ass_policy_holders', $policy_holder);
+    $policy_holders[$record['numero_assure']] = $policy_holder_id;
+    insert_policy_holder_metadata(db_connect(function () use ($options) {
+        return create_dst_connection($options);
+    }, $pdo), $record, $options, $policy_holder_id);
 
     // Return the create policy holder id
     return $policy_holder_id;
@@ -203,7 +306,6 @@ function main(array $args)
         printf("Inserting record for assures [%s] \n", $assure['numero_assure']);
         $policy_holder_id = insert_policy_holder($dstPdo, $assure, $options, $policy_holders);
         if (!is_string($policy_holder_id)) {
-            printf("Unable to insert assure [%s] into database, policy holder already exists\n", $assure['numero_assure']);
             continue;
         }
         printf("Inserted record for assures [%s] \n", $assure['numero_assure']);

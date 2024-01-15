@@ -66,19 +66,19 @@ function select_users(\PDO $pdo, string $table)
  * @return array|Iterator 
  * @throws PDOException 
  */
-function select_user(\PDO $pdo, string $table, $username, $user_id)
+function select_user(\PDO $pdo, string $table, $user_id)
 {
     $sql = "
         SELECT user_id
         FROM $table
-        WHERE user_name=? AND user_id=?
+        WHERE user_id=?
         LIMIT 1
     ";
     // Create and prepare PDO statement
     $stmt = $pdo->prepare($sql);
+    
     // Bind pdo parameters
-    $stmt->bindParam(1, $username, \PDO::PARAM_STR);
-    $stmt->bindParam(2, $user_id, \PDO::PARAM_INT);
+    $stmt->bindParam(1, $user_id, \PDO::PARAM_INT);
 
     // Execute the PDO statement
     $stmt->execute();
@@ -143,28 +143,27 @@ function main(array $args)
     printf("Migrating total of %d users...\n", $total);
 
     foreach ($users as $user) {
-        # code...
-        $result = db_insert(db_connect(function () use ($options) {
+
+        // 
+        $result = select_user(db_connect(function () use ($options) {
             return create_dst_connection($options);
-        }, $dstPdo), 'auth_users', [
-            'user_id' => $user['id'],
-            'user_name' => $user['username'],
-            'user_password' => $user['password'],
-            'lock_enabled' => 0,
-            'login_attempts' => null,
-            'lock_expired_at' => null,
-            'double_auth_active' => $user['double_auth_active'],
-            'is_active' => $user['is_active'],
-            'is_verified' => 1
-        ]);
+        }, $dstPdo), 'auth_users', $user['id']);
 
         if (!$result) {
-            $result = select_user(db_connect(function () use ($options) {
+            $result = db_insert(db_connect(function () use ($options) {
                 return create_dst_connection($options);
-            }, $dstPdo), 'auth_users', $user['username'], $user['id']);
-        }
+            }, $dstPdo), 'auth_users', [
+                'user_id' => $user['id'],
+                'user_name' => $user['username'],
+                'user_password' => $user['password'],
+                'lock_enabled' => 0,
+                'login_attempts' => null,
+                'lock_expired_at' => null,
+                'double_auth_active' => $user['double_auth_active'],
+                'is_active' => $user['is_active'],
+                'is_verified' => 1
+            ]);
 
-        if ($result && is_array($result)) {
             // TODO: Insert into auth_user_details if contact is a phone number
             if (false !== filter_var($user['username'], FILTER_VALIDATE_EMAIL) && isset($user['contact'])) {
                 db_insert(db_connect(function () use ($options) {
@@ -175,7 +174,9 @@ function main(array $args)
                     'email' => $user['username']
                 ]);
             }
+        }
 
+        if ($result && is_array($result)) {
             // TODO Add user to registant_user table
             $registrant = get_registrant(db_connect(function () use ($options) {
                 return create_app_connection($options);

@@ -274,6 +274,51 @@ function db_insert_many(\PDO $pdo, $table, array $data)
 }
 
 /**
+ * 
+ * @param PDO $pdo 
+ * @param string $table 
+ * @param string $sql 
+ * @param array $params 
+ * @return int 
+ * @throws PDOException 
+ */
+function db_update(\PDO $pdo, string $sql, array $params)
+{
+    $stmt= $pdo->prepare($sql);
+    $values = array_reduce(array_keys($params), function ($carry, $current) use ($params) {
+        $carry[$current] = $params[$current];
+        return $carry;
+    }, []);
+    $stmt->execute($values);
+
+    // Return the number of affected rows
+    return $stmt->rowCount();
+}
+
+
+/**
+ * 
+ * @param PDO $pdo 
+ * @param string $table 
+ * @param string $sql 
+ * @param array $params 
+ * @return int 
+ * @throws PDOException 
+ */
+function db_execute(\PDO $pdo, string $sql, array $params)
+{
+    $stmt= $pdo->prepare($sql);
+    $values = array_reduce(array_keys($params), function ($carry, $current) use ($params) {
+        $carry[$current] = $params[$current];
+        return $carry;
+    }, []);
+    $stmt->execute($values);
+
+    // Return the number of affected rows
+    return $stmt->rowCount();
+}
+
+/**
  * @param callable $conn_factory 
  * @param PDO|null $connection 
  * @return PDO 
@@ -299,3 +344,5 @@ function db_connect(callable $conn_factory, \PDO $connection = null)
     }
     throw new RuntimeException('Too many attempt to create database connection');
 }
+
+
