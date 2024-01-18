@@ -80,6 +80,22 @@ function delete_policy_holder_metadata(\PDO $pdo, string $policy_holder_id)
     }
 }
 
+
+/**
+ * @param PDO $pdo 
+ * @param string|null $ssn 
+ * @return array|Iterator 
+ * @throws PDOException 
+ */
+function get_assures_carriere(\PDO $pdo, string $ssn)
+{
+    $sql = "SELECT numero_assure, numero_employeur, date_entree, date_sortie
+            FROM carriere_assures
+            WHERE numero_assure=?";
+    return db_select($pdo, $sql, [[1, $ssn, \PDO::PARAM_STR]], true, \PDO::FETCH_ASSOC);
+}
+
+
 function insert_policy_holder_metadata(\PDO $pdo, array $record, array $options, $policy_holder_id)
 {
     // Insert policy holder contact
@@ -115,7 +131,7 @@ function insert_policy_holder_metadata(\PDO $pdo, array $record, array $options,
     }, $pdo), 'ass_policy_holder_addresses', $address);
 
     // Insert father's information
-    $address = [
+    $father = [
         'id' => str_uuid(),
         'policy_holder_id' => $policy_holder_id,
         'firstname' => $record['prenom_pere'] ?? null,
@@ -128,10 +144,10 @@ function insert_policy_holder_metadata(\PDO $pdo, array $record, array $options,
 
     db_insert(db_connect(function () use ($options) {
         return create_dst_connection($options);
-    }, $pdo), 'ass_policy_holder_ancestors', $address);
+    }, $pdo), 'ass_policy_holder_ancestors', $father);
 
     // Insert mother's information
-    $address = [
+    $mother = [
         'id' => str_uuid(),
         'policy_holder_id' => $policy_holder_id,
         'firstname' => $record['prenom_mere'] ?? null,
@@ -143,10 +159,83 @@ function insert_policy_holder_metadata(\PDO $pdo, array $record, array $options,
     ];
     db_insert(db_connect(function () use ($options) {
         return create_dst_connection($options);
-    }, $pdo), 'ass_policy_holder_ancestors', $address);
+    }, $pdo), 'ass_policy_holder_ancestors', $mother);
 }
 
-function insert_policy_holder(\PDO $pdo, array $record, array $options, &$policy_holders)
+function find_registrant_policy_holder(\PDO $pdo, string $table, $registrant_id, $policy_holder_id)
+{
+    $sql = "SELECT id
+    FROM $table
+    WHERE policy_holder_id=? AND registrant_id=?
+    LIMIT 1";
+    // Create and prepare PDO statement
+    $stmt = $pdo->prepare($sql);
+
+    // Bind pdo parameters
+    $stmt->bindParam(1, $policy_holder_id, \PDO::PARAM_STR);
+    $stmt->bindParam(2, $registrant_id, \PDO::PARAM_STR);
+
+    // Execute the PDO statement
+    $stmt->execute();
+
+    // Return the result of the query
+    return $stmt->fetch(\PDO::FETCH_ASSOC);
+}
+
+function upsert_registrant_policy_holder(\PDO $pdo, array $options, $policy_holder_id, $registrant_id, array $values)
+{
+    $registrant_policy_holder = find_registrant_policy_holder($pdo, 'ass_registrant_policy_holders', $registrant_id, $policy_holder_id);
+
+    if ($registrant_policy_holder) {
+        $updates = array_merge($values, ['registrant_id' => $registrant_id, 'policy_holder_id' => $policy_holder_id]);
+        $updates = array_reduce(array_keys($values), function ($carry, $curr) {
+            $carry[] = "$curr=?";
+            return $carry;
+        }, []);
+        $sql = "UPDATE ass_registrant_policy_holders SET " . implode(", ", $updates) . " WHERE policy_holder_id=? AND registrant_id=?";
+        db_update($pdo, $sql, [...array_values($values), $policy_holder_id, $registrant_id]);
+        return;
+    }
+
+    db_insert(db_connect(function () use ($options) {
+        return create_dst_connection($options);
+    }, $pdo), 'ass_registrant_policy_holders', array_merge($values, ['id' => str_uuid(), 'registrant_id' => $registrant_id, 'policy_holder_id' => $policy_holder_id]));
+}
+
+function insert_registrant_policy_holders($record, $policy_holder_id, array $options, \PDO $pdo = null, \PDO $srcPdo = null)
+{
+    printf("Deleting registrant policy holder for assure: %s\n", $record['numero_assure']);
+    $result = db_execute($pdo, "DELETE FROM ass_registrant_policy_holders WHERE policy_holder_id=?", [$policy_holder_id]);
+    printf("Deleting a total of %d entries...\n", $result);
+    printf("Inserting registrant policy holders records for assure: %s\n", $record['numero_assure']);
+
+    // Query assure carrier
+    $carrieres = get_assures_carriere(db_connect(function () use ($options) {
+        return create_src_connection($options);
+    }, $srcPdo), $record['numero_assure']);
+
+    foreach ($carrieres as $value) {
+        db_insert(db_connect(function () use ($options) {
+            return create_dst_connection($options);
+        }, $pdo), 'ass_registrant_policy_holders', [
+            'id' => str_uuid(),
+            'start_date' => $value['date_entree'],
+            'end_date' => $value['date_sortie'],
+            'registrant_id' => $value['numero_employeur'],
+            'policy_holder_id' => $policy_holder_id
+        ]);
+    }
+
+    // Insert registrant_policy_holder for numero_employeur_actuel
+    if (isset($record['date_embauche']) && isset($record['numero_employeur_actuel'])) {
+        upsert_registrant_policy_holder($pdo, $options, $policy_holder_id, $record['numero_employeur_actuel'], [
+            'start_date' => $record['date_embauche'],
+            'end_date' => null,
+        ]);
+    }
+}
+
+function insert_policy_holder(\PDO $pdo, \PDO $srcPdo, array $record, array $options, &$policy_holders)
 {
 
     // Check if policy holder exists with the ssn
@@ -185,7 +274,7 @@ function insert_policy_holder(\PDO $pdo, array $record, array $options, &$policy
                 'civil_state_id' => $record['code_civilite'] ?? null
             ]);
         }
-        // TODO: Delete existing contact address ascendant and insert new records
+        // TODO: Delete existing contact address and insert new records
         if (isset($policy_holder['id'])) {
             // First we remove any existing policy holder metadata
             printf("Deleting policy holder [%s] metadata...\n", $policy_holder['sin']);
@@ -198,6 +287,9 @@ function insert_policy_holder(\PDO $pdo, array $record, array $options, &$policy
             insert_policy_holder_metadata(db_connect(function () use ($options) {
                 return create_dst_connection($options);
             }, $pdo), $record, $options, $policy_holder['id']);
+
+            // Insert carriere assurés
+            insert_registrant_policy_holders($record, $policy_holder['id'], $options, $pdo, $srcPdo);
         }
         return;
     }
@@ -238,10 +330,17 @@ function insert_policy_holder(\PDO $pdo, array $record, array $options, &$policy
     db_insert(db_connect(function () use ($options) {
         return create_dst_connection($options);
     }, $pdo), 'ass_policy_holders', $policy_holder);
+
     $policy_holders[$record['numero_assure']] = $policy_holder_id;
+
+    // Insert policy holder metadata such as contact, addresses, ancestors
     insert_policy_holder_metadata(db_connect(function () use ($options) {
         return create_dst_connection($options);
     }, $pdo), $record, $options, $policy_holder_id);
+
+
+    // Insert carriere assurés
+    insert_registrant_policy_holders($record, $policy_holder_id, $options, $pdo, $srcPdo);
 
     // Return the create policy holder id
     return $policy_holder_id;
@@ -307,14 +406,14 @@ function main(array $args)
     foreach ($assures as $assure) {
         try {
             printf("Inserting record for assure [%s] \n", $assure['numero_assure']);
-            $policy_holder_id = insert_policy_holder($dstPdo, $assure, $options, $policy_holders);
+            $policy_holder_id = insert_policy_holder($dstPdo, $pdo, $assure, $options, $policy_holders);
             if (!is_string($policy_holder_id)) {
                 continue;
             }
             printf("Inserted record for assures [%s] \n", $assure['numero_assure']);
         } catch (\PDOException $e) {
             printf("Error while inserting record for assure [%s]: %s \n", $assure['numero_assure'], $e->getMessage());
-            
+
             $failed_migrations[] = $assure;
             // Case there was a PDO exception when execting migration, we add the failed
             // assure record to the failed task array and recreate connection to the database
@@ -338,7 +437,7 @@ function main(array $args)
         foreach ($assures as $assure) {
             try {
                 printf("Inserting failed record for assure [%s] \n", $assure['numero_assure']);
-                $policy_holder_id = insert_policy_holder($dstPdo, $assure, $options, $policy_holders);
+                $policy_holder_id = insert_policy_holder($dstPdo, $pdo, $assure, $options, $policy_holders);
                 if (!is_string($policy_holder_id)) {
                     continue;
                 }
