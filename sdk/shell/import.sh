@@ -66,12 +66,13 @@ user=$MARIADB_APP_USER
 password=$MARIADB_APP_PASSWORD
 EOL
 
-mkdir -p ~/.etl/db/.backups
+mkdir -p "$HOME/.etl/db/.backups"
+chmod -R 777 "$HOME/.etl/db/.backups"
 current_time=$(date +%s)
 
 # TODO: Delete existing backups
 echo "Creating database backup"
-mariadb-dump --defaults-extra-file="./my-client.cnf" $MARIADB_APP_DB ass_registrants ass_registrant_contacts ass_persons ass_policy_holders ass_policy_holder_contacts ass_policy_holder_addresses ass_policy_holder_ancestors ass_registrant_policy_holders ass_mariage_bounds ass_parenting_bounds --port $MARIADB_APP_PORT > "~/.etl/db/.backups/$current_time.sql"
+mariadb-dump --defaults-extra-file="./my-client.cnf" $MARIADB_APP_DB ass_registrants ass_registrant_contacts ass_persons ass_policy_holders ass_policy_holder_contacts ass_policy_holder_addresses ass_policy_holder_ancestors ass_registrant_policy_holders ass_mariage_bounds ass_parenting_bounds --port $MARIADB_APP_PORT > "$HOME/.etl/db/.backups/$current_time.sql"
 
 echo "Deleting client configuration"
 rm -rf my-client.cnf
