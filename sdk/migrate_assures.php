@@ -259,34 +259,34 @@ function insert_policy_holder(\PDO $pdo, \PDO $srcPdo, array $record, array $opt
         ]);
 
         // Update policy holder ass_persons
-        if (isset($policy_holder['person_id'])) {
-            update_persons(db_connect(function () use ($options) {
-                return create_dst_connection($options);
-            }, $pdo), 'ass_persons', $policy_holder['person_id'], [
-                'firstname' => $record['prenoms'],
-                'lastname' => $record['nom'],
-                'sex' => $record['sexe'],
-                'birth_date' => $record['date_naissance'],
-                'birth_place' => $record['lieu_naissance'] ?? null,
-                'birth_country' => $record['code_pays_nais'] ?? null,
-                'nationality' => $record['code_pays_nationalite'] ?? null,
-                'marital_status_id' => $record['code_site_matri_actuel'] ?? null,
-                'civil_state_id' => $record['code_civilite'] ?? null
-            ]);
-        }
+        // if (isset($policy_holder['person_id'])) {
+        //     update_persons(db_connect(function () use ($options) {
+        //         return create_dst_connection($options);
+        //     }, $pdo), 'ass_persons', $policy_holder['person_id'], [
+        //         'firstname' => $record['prenoms'],
+        //         'lastname' => $record['nom'],
+        //         'sex' => $record['sexe'],
+        //         'birth_date' => $record['date_naissance'],
+        //         'birth_place' => $record['lieu_naissance'] ?? null,
+        //         'birth_country' => $record['code_pays_nais'] ?? null,
+        //         'nationality' => $record['code_pays_nationalite'] ?? null,
+        //         'marital_status_id' => $record['code_site_matri_actuel'] ?? null,
+        //         'civil_state_id' => $record['code_civilite'] ?? null
+        //     ]);
+        // }
         // TODO: Delete existing contact address and insert new records
         if (isset($policy_holder['id'])) {
             // First we remove any existing policy holder metadata
-            printf("Deleting policy holder [%s] metadata...\n", $policy_holder['sin']);
-            delete_policy_holder_metadata(db_connect(function () use ($options) {
-                return create_dst_connection($options);
-            }, $pdo), $policy_holder['id']);
+            // printf("Deleting policy holder [%s] metadata...\n", $policy_holder['sin']);
+            // delete_policy_holder_metadata(db_connect(function () use ($options) {
+            //     return create_dst_connection($options);
+            // }, $pdo), $policy_holder['id']);
 
-            printf("Inserting new policy holder [%s] metadata...\n", $policy_holder['sin']);
-            // The we insert back new values
-            insert_policy_holder_metadata(db_connect(function () use ($options) {
-                return create_dst_connection($options);
-            }, $pdo), $record, $options, $policy_holder['id']);
+            // printf("Inserting new policy holder [%s] metadata...\n", $policy_holder['sin']);
+            // // The we insert back new values
+            // insert_policy_holder_metadata(db_connect(function () use ($options) {
+            //     return create_dst_connection($options);
+            // }, $pdo), $record, $options, $policy_holder['id']);
 
             // Insert carriere assurés
             insert_registrant_policy_holders($record, $policy_holder['id'], $options, $pdo, $srcPdo);
