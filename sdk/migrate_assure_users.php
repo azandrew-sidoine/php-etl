@@ -76,7 +76,7 @@ function select_user(\PDO $pdo, string $table, $user_id)
     ";
     // Create and prepare PDO statement
     $stmt = $pdo->prepare($sql);
-    
+
     // Bind pdo parameters
     $stmt->bindParam(1, $user_id, \PDO::PARAM_INT);
 
@@ -99,6 +99,34 @@ function get_policy_holder(\PDO $pdo, string $table, string $ssn)
 
     // Bind pdo parameters
     $stmt->bindParam(1, $ssn, \PDO::PARAM_STR);
+
+    // Execute the PDO statement
+    $stmt->execute();
+
+    // Return the result of the query
+    return $stmt->fetch(\PDO::FETCH_ASSOC);
+}
+
+/**
+ * Get the policy holder user matching the user id
+ * 
+ * @param PDO $pdo 
+ * @param string $table 
+ * @param mixed $user_id 
+ * @return mixed 
+ * @throws PDOException 
+ */
+function get_policy_holder_user(\PDO $pdo, string $table, $user_id)
+{
+    $sql = "SELECT id
+            FROM $table
+            WHERE user_id=?
+            LIMIT 1";
+    // Create and prepare PDO statement
+    $stmt = $pdo->prepare($sql);
+
+    // Bind pdo parameters
+    $stmt->bindParam(1, $user_id, \PDO::PARAM_STR);
 
     // Execute the PDO statement
     $stmt->execute();
@@ -174,9 +202,18 @@ function main(array $args)
             }
         }
 
+
         if ($result && is_array($result)) {
+            $policy_holder_user = get_policy_holder_user(db_connect(function () use ($options) {
+                return create_app_connection($options);
+            }, $appPdo), 'ass_policy_holder_users', $result['user_id']);
+
+            if ($policy_holder_user && is_array($policy_holder_user)) {
+                printf("policy holder user account exists for %s, processing next iteration...\n", $result['user_id']);
+                continue;
+            }
             // TODO Add user to policy_holder_users table
-            if(isset($user['numero_assurance'])) {
+            if (isset($user['numero_assurance'])) {
                 $policy_holder = get_policy_holder(db_connect(function () use ($options) {
                     return create_app_connection($options);
                 }, $appPdo), 'ass_policy_holders', $user['numero_assurance']);
@@ -189,7 +226,6 @@ function main(array $args)
                         'validated' => 1
                     ]);
                 }
-
             } else {
                 printf("No numero assurance for assure %s, processing next record\n", $user['username'] ?? 'Unknown');
             }
