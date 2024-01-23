@@ -143,6 +143,7 @@ function main(array $args)
     printf("Migrating total of %d users...\n", $total);
 
     foreach ($users as $user) {
+        printf("Processing user %s records...\n", $user['username'] ?? 'Unknown');
 
         // 
         $result = select_user(db_connect(function () use ($options) {
@@ -178,20 +179,23 @@ function main(array $args)
 
         if ($result && is_array($result)) {
             // TODO Add user to registant_user table
-            $registrant = get_registrant(db_connect(function () use ($options) {
-                return create_app_connection($options);
-            }, $appPdo), 'ass_registrants', $user['numero_assurance']);
-            if ($registrant) {
-                db_insert(db_connect(function () use ($options) {
+            if(isset($user['numero_assurance'])) {
+                $registrant = get_registrant(db_connect(function () use ($options) {
                     return create_app_connection($options);
-                }, $appPdo), 'ass_registrant_users', [
-                    'user_id' => $result['user_id'],
-                    'registrant_id' => $registrant['id'],
-                    'validated' => 1
-                ]);
+                }, $appPdo), 'ass_registrants', $user['numero_assurance']);
+                if ($registrant) {
+                    db_insert(db_connect(function () use ($options) {
+                        return create_app_connection($options);
+                    }, $appPdo), 'ass_registrant_users', [
+                        'user_id' => $result['user_id'],
+                        'registrant_id' => $registrant['id'],
+                        'validated' => 1
+                    ]);
+                }
+            } else {
+                printf("No numero_assurance for user %s, processing next record\n", $user['username'] ?? 'Unknown');
             }
         }
-        printf(".");
     }
     printf(sprintf("\nThanks for using the program!\n"));
 }

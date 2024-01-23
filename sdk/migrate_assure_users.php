@@ -143,6 +143,7 @@ function main(array $args)
     printf("Migrating total of %d users...\n", $total);
 
     foreach ($users as $user) {
+        printf("Processing user %s records...\n", $user['username'] ?? 'Unknown');
         $result = select_user(db_connect(function () use ($options) {
             return create_dst_connection($options);
         }, $dstPdo), 'auth_users', $user['id']);
@@ -189,9 +190,10 @@ function main(array $args)
                     ]);
                 }
 
+            } else {
+                printf("No numero_assure for user %s, processing next record\n", $user['username'] ?? 'Unknown');
             }
         }
-        printf(".");
     }
     printf(sprintf("\nThanks for using the program!\n"));
 }
