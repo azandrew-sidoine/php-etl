@@ -193,7 +193,7 @@ function main(array $args)
                     ]);
                 }
             } else {
-                printf("No numero_assurance for user %s, processing next record\n", $user['username'] ?? 'Unknown');
+                printf("No numero assurance for employeur %s, processing next record\n", $user['username'] ?? 'Unknown');
             }
         }
     }
