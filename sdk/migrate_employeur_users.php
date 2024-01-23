@@ -107,6 +107,35 @@ function get_registrant(\PDO $pdo, string $table, string $ssn)
     return $stmt->fetch(\PDO::FETCH_ASSOC);
 }
 
+
+/**
+ * Get the registrant user matching the user id
+ * 
+ * @param PDO $pdo 
+ * @param string $table 
+ * @param mixed $user_id 
+ * @return mixed 
+ * @throws PDOException 
+ */
+function get_registrant_user(\PDO $pdo, string $table, $user_id)
+{
+    $sql = "SELECT id
+            FROM $table
+            WHERE user_id=?
+            LIMIT 1";
+    // Create and prepare PDO statement
+    $stmt = $pdo->prepare($sql);
+
+    // Bind pdo parameters
+    $stmt->bindParam(1, $user_id, \PDO::PARAM_STR);
+
+    // Execute the PDO statement
+    $stmt->execute();
+
+    // Return the result of the query
+    return $stmt->fetch(\PDO::FETCH_ASSOC);
+}
+
 function main(array $args)
 {
     $program = 'Program: Migrate CNSS employeur users data from source to destination database';
@@ -178,6 +207,14 @@ function main(array $args)
         }
 
         if ($result && is_array($result)) {
+            $registrant_user = get_registrant_user(db_connect(function () use ($options) {
+                return create_app_connection($options);
+            }, $appPdo), 'ass_registrant_users', $result['user_id']);
+
+            if ($registrant_user && is_array($registrant_user)) {
+                printf("registrant user account exists for %s, processing next iteration...\n", $result['user_id']);
+                continue;
+            }
             // TODO Add user to registant_user table
             if(isset($user['numero_assurance'])) {
                 $registrant = get_registrant(db_connect(function () use ($options) {
