@@ -191,7 +191,7 @@ function main(array $args)
                 }
 
             } else {
-                printf("No numero_assure for user %s, processing next record\n", $user['username'] ?? 'Unknown');
+                printf("No numero assurance for assure %s, processing next record\n", $user['username'] ?? 'Unknown');
             }
         }
     }
