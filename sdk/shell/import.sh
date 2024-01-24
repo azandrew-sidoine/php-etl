@@ -72,7 +72,7 @@ password=$MARIADB_APP_PASSWORD
 EOL
 
 mkdir -p "$HOME/.etl/db/.backups"
-chmod -R 777 "$HOME/.etl/db/.backups"
+chmod 777 "$HOME/.etl/db/.backups"
 current_time=$(date +%s)
 
 # TODO: Delete existing backups
