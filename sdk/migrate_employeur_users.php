@@ -172,66 +172,70 @@ function main(array $args)
     printf("Migrating total of %d users...\n", $total);
 
     foreach ($users as $user) {
-        printf("Processing user %s records...\n", $user['username'] ?? 'Unknown');
+        try {
+            printf("Processing user %s records...\n", $user['username'] ?? 'Unknown');
 
-        // 
-        $result = select_user(db_connect(function () use ($options) {
-            return create_dst_connection($options);
-        }, $dstPdo), 'auth_users', $user['id']);
-
-        if (!$result) {
-            $result = db_insert(db_connect(function () use ($options) {
+            // 
+            $result = select_user(db_connect(function () use ($options) {
                 return create_dst_connection($options);
-            }, $dstPdo), 'auth_users', [
-                'user_id' => $user['id'],
-                'user_name' => $user['username'],
-                'user_password' => $user['password'],
-                'lock_enabled' => 0,
-                'login_attempts' => null,
-                'lock_expired_at' => null,
-                'double_auth_active' => $user['double_auth_active'],
-                'is_active' => $user['is_active'],
-                'is_verified' => 1
-            ]);
+            }, $dstPdo), 'auth_users', $user['id']);
 
-            // TODO: Insert into auth_user_details if contact is a phone number
-            if (false !== filter_var($user['username'], FILTER_VALIDATE_EMAIL) && isset($user['contact'])) {
-                db_insert(db_connect(function () use ($options) {
+            if (!$result) {
+                $result = db_insert(db_connect(function () use ($options) {
                     return create_dst_connection($options);
-                }, $dstPdo), 'auth_user_details', [
-                    'user_id' => $result['user_id'],
-                    'phone_number' => $user['contact'],
-                    'email' => $user['username']
+                }, $dstPdo), 'auth_users', [
+                    'user_id' => $user['id'],
+                    'user_name' => $user['username'],
+                    'user_password' => $user['password'],
+                    'lock_enabled' => 0,
+                    'login_attempts' => null,
+                    'lock_expired_at' => null,
+                    'double_auth_active' => $user['double_auth_active'],
+                    'is_active' => $user['is_active'],
+                    'is_verified' => 1
                 ]);
-            }
-        }
 
-        if ($result && is_array($result)) {
-            $registrant_user = get_registrant_user(db_connect(function () use ($options) {
-                return create_app_connection($options);
-            }, $appPdo), 'ass_registrant_users', $result['user_id']);
-
-            if ($registrant_user && is_array($registrant_user)) {
-                printf("registrant user account exists for %s, processing next iteration...\n", $result['user_id']);
-                continue;
-            }
-            // TODO Add user to registant_user table
-            if(isset($user['numero_assurance'])) {
-                $registrant = get_registrant(db_connect(function () use ($options) {
-                    return create_app_connection($options);
-                }, $appPdo), 'ass_registrants', $user['numero_assurance']);
-                if ($registrant) {
+                // TODO: Insert into auth_user_details if contact is a phone number
+                if (false !== filter_var($user['username'], FILTER_VALIDATE_EMAIL) && isset($user['contact'])) {
                     db_insert(db_connect(function () use ($options) {
-                        return create_app_connection($options);
-                    }, $appPdo), 'ass_registrant_users', [
-                        'user_id' => $result['user_id'],
-                        'registrant_id' => $registrant['id'],
-                        'validated' => 1
+                        return create_dst_connection($options);
+                    }, $dstPdo), 'auth_user_details', [
+                        'user_id' => $user['id'],
+                        'phone_number' => $user['contact'],
+                        'email' => $user['username']
                     ]);
                 }
-            } else {
-                printf("No numero assurance for employeur %s, processing next record\n", $user['username'] ?? 'Unknown');
             }
+
+            if ($user && is_array($user) && isset($user['id'])) {
+                $registrant_user = get_registrant_user(db_connect(function () use ($options) {
+                    return create_app_connection($options);
+                }, $appPdo), 'ass_registrant_users', $user['id']);
+
+                if ($registrant_user && is_array($registrant_user)) {
+                    printf("registrant user account exists for %s, processing next iteration...\n", $user['id']);
+                    continue;
+                }
+                // TODO Add user to registant_user table
+                if(isset($user['numero_assurance'])) {
+                    $registrant = get_registrant(db_connect(function () use ($options) {
+                        return create_app_connection($options);
+                    }, $appPdo), 'ass_registrants', $user['numero_assurance']);
+                    if ($registrant) {
+                        db_insert(db_connect(function () use ($options) {
+                            return create_app_connection($options);
+                        }, $appPdo), 'ass_registrant_users', [
+                            'user_id' => $user['id'],
+                            'registrant_id' => $registrant['id'],
+                            'validated' => 1
+                        ]);
+                    }
+                } else {
+                    printf("No numero assurance for employeur %s, processing next record\n", $user['username'] ?? 'Unknown');
+                }
+            }
+        } catch (\PDOException $e) {
+            printf("Error while inserting data for employeur %s: %s\n", $user['username'] ?? 'Unknown', $e->getMessage());
         }
     }
     printf(sprintf("\nThanks for using the program!\n"));
