@@ -30,7 +30,7 @@ echo "Authenticating to remote server to through ssh..."
 ssh $2@$3 /bin/sh <<EOL
     mkdir -p /home/$2/.etl
     cd /home/$2/.etl
-    mysqldump --defaults-extra-file=$CONFIG_PATH cnss_db employeurs assures carriere_assures users --user cnssdev --port 3306 > employeur_assures.sql
+    mysqldump --defaults-extra-file=$CONFIG_PATH cnss_db employeurs assures carriere_assures --user cnssdev --port 3306 > employeur_assures.sql
     mysqldump --defaults-extra-file=$CONFIG_PATH cnss_db enfants assure_conjoints conjoints type_liens etat_conjoints --user cnssdev --port 3306 > beneficiaires.sql
     rm -f $CONFIG_PATH
 EOL
