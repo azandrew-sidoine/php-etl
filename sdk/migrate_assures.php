@@ -235,18 +235,20 @@ function insert_registrant_policy_holders($record, $policy_holder_id, array $opt
     }
 }
 
+
 function insert_policy_holder(\PDO $pdo, \PDO $srcPdo, array $record, array $options, &$policy_holders)
 {
-
     // Check if policy holder exists with the ssn
+    printf("Select policy holder started at [%s]\n", date('Y-m-d H:i:s'));
     $policy_holder = get_policy_holder(db_connect(function () use ($options) {
         return create_dst_connection($options);
     }, $pdo), $record['numero_assure']);
+    printf("Select policy holder completed at [%s]\n", date('Y-m-d H:i:s'));
 
     // #region updates
     if ($policy_holder && is_array($policy_holder)) {
         printf("Policy holder %s, already exists, updating...\n", strval($record['numero_assure']));
-
+        printf("Policy holder update started at [%s]\n", date('Y-m-d H:i:s'));
         // We update the policy holder columns values case it already exists
         update_policy_holder(db_connect(function () use ($options) {
             return create_dst_connection($options);
@@ -257,6 +259,7 @@ function insert_policy_holder(\PDO $pdo, \PDO $srcPdo, array $record, array $opt
             'handicaped' => isset($record['code_etat_handicap']) && strtoupper($record['code_etat_handicap']) === 'O' ? 1 : 0,
             'status' => $record['etat_assure']
         ]);
+        printf("Policy holder update completed at [%s]\n", date('Y-m-d H:i:s'));
 
         // Update policy holder ass_persons
         // if (isset($policy_holder['person_id'])) {
@@ -289,7 +292,9 @@ function insert_policy_holder(\PDO $pdo, \PDO $srcPdo, array $record, array $opt
             // }, $pdo), $record, $options, $policy_holder['id']);
 
             // Insert carriere assurés
+            printf("Registrant policy holder update started at [%s]\n", date('Y-m-d H:i:s'));
             insert_registrant_policy_holders($record, $policy_holder['id'], $options, $pdo, $srcPdo);
+            printf("Registrant policy holder update completed at [%s]\n", date('Y-m-d H:i:s'));
         }
         return;
     }
