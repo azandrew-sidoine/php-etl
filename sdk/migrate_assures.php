@@ -235,18 +235,20 @@ function insert_registrant_policy_holders($record, $policy_holder_id, array $opt
     }
 }
 
+
 function insert_policy_holder(\PDO $pdo, \PDO $srcPdo, array $record, array $options, &$policy_holders)
 {
-
     // Check if policy holder exists with the ssn
+    printf("Select policy holder started at [%s]\n", date('Y-m-d H:i:s'));
     $policy_holder = get_policy_holder(db_connect(function () use ($options) {
         return create_dst_connection($options);
     }, $pdo), $record['numero_assure']);
+    printf("Select policy holder completed at [%s]\n", date('Y-m-d H:i:s'));
 
     // #region updates
     if ($policy_holder && is_array($policy_holder)) {
         printf("Policy holder %s, already exists, updating...\n", strval($record['numero_assure']));
-
+        printf("Policy holder update started at [%s]\n", date('Y-m-d H:i:s'));
         // We update the policy holder columns values case it already exists
         update_policy_holder(db_connect(function () use ($options) {
             return create_dst_connection($options);
@@ -257,39 +259,42 @@ function insert_policy_holder(\PDO $pdo, \PDO $srcPdo, array $record, array $opt
             'handicaped' => isset($record['code_etat_handicap']) && strtoupper($record['code_etat_handicap']) === 'O' ? 1 : 0,
             'status' => $record['etat_assure']
         ]);
+        printf("Policy holder update completed at [%s]\n", date('Y-m-d H:i:s'));
 
         // Update policy holder ass_persons
-        if (isset($policy_holder['person_id'])) {
-            update_persons(db_connect(function () use ($options) {
-                return create_dst_connection($options);
-            }, $pdo), 'ass_persons', $policy_holder['person_id'], [
-                'firstname' => $record['prenoms'],
-                'lastname' => $record['nom'],
-                'sex' => $record['sexe'],
-                'birth_date' => $record['date_naissance'],
-                'birth_place' => $record['lieu_naissance'] ?? null,
-                'birth_country' => $record['code_pays_nais'] ?? null,
-                'nationality' => $record['code_pays_nationalite'] ?? null,
-                'marital_status_id' => $record['code_site_matri_actuel'] ?? null,
-                'civil_state_id' => $record['code_civilite'] ?? null
-            ]);
-        }
+        // if (isset($policy_holder['person_id'])) {
+        //     update_persons(db_connect(function () use ($options) {
+        //         return create_dst_connection($options);
+        //     }, $pdo), 'ass_persons', $policy_holder['person_id'], [
+        //         'firstname' => $record['prenoms'],
+        //         'lastname' => $record['nom'],
+        //         'sex' => $record['sexe'],
+        //         'birth_date' => $record['date_naissance'],
+        //         'birth_place' => $record['lieu_naissance'] ?? null,
+        //         'birth_country' => $record['code_pays_nais'] ?? null,
+        //         'nationality' => $record['code_pays_nationalite'] ?? null,
+        //         'marital_status_id' => $record['code_site_matri_actuel'] ?? null,
+        //         'civil_state_id' => $record['code_civilite'] ?? null
+        //     ]);
+        // }
         // TODO: Delete existing contact address and insert new records
         if (isset($policy_holder['id'])) {
             // First we remove any existing policy holder metadata
-            printf("Deleting policy holder [%s] metadata...\n", $policy_holder['sin']);
-            delete_policy_holder_metadata(db_connect(function () use ($options) {
-                return create_dst_connection($options);
-            }, $pdo), $policy_holder['id']);
+            // printf("Deleting policy holder [%s] metadata...\n", $policy_holder['sin']);
+            // delete_policy_holder_metadata(db_connect(function () use ($options) {
+            //     return create_dst_connection($options);
+            // }, $pdo), $policy_holder['id']);
 
-            printf("Inserting new policy holder [%s] metadata...\n", $policy_holder['sin']);
-            // The we insert back new values
-            insert_policy_holder_metadata(db_connect(function () use ($options) {
-                return create_dst_connection($options);
-            }, $pdo), $record, $options, $policy_holder['id']);
+            // printf("Inserting new policy holder [%s] metadata...\n", $policy_holder['sin']);
+            // // The we insert back new values
+            // insert_policy_holder_metadata(db_connect(function () use ($options) {
+            //     return create_dst_connection($options);
+            // }, $pdo), $record, $options, $policy_holder['id']);
 
             // Insert carriere assurés
+            printf("Registrant policy holder update started at [%s]\n", date('Y-m-d H:i:s'));
             insert_registrant_policy_holders($record, $policy_holder['id'], $options, $pdo, $srcPdo);
+            printf("Registrant policy holder update completed at [%s]\n", date('Y-m-d H:i:s'));
         }
         return;
     }
